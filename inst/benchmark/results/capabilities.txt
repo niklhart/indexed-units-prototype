@@ -1,0 +1,8 @@
+IndexedUnits sparse pivot and print:
+# A tibble: 2 × 3
+     id a          b         
+  <int> <IndxdUnt> <IndxdUnt>
+1     1 1 [mg]     NA [NA]   
+2     2 2 [L]       4 [mg]   
+mixed_units sparse pivot and print:
+ERROR: 'list' object cannot be coerced to type 'double' 
