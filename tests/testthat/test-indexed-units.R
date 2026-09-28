@@ -107,3 +107,44 @@ test_that("tidyr pivots round trip numeric values and units without list columns
     expect_indexed(sparse$b, c(NA, 4), c(NA, "mg"))
     expect_false(is.list(long$value))
 })
+
+test_that("dictionary remapping preserves reordered, unused and unknown units", {
+    x <- indexed_units(c(a = 1, b = 2, c = NA), c("mg", "L", NA))
+    y <- indexed_units(c(3, 4), c("L", "mg"))
+    expect_indexed(c(x, y), c(1, 2, NA, 3, 4), c("mg", "L", NA, "L", "mg"))
+    x[c("a", "b")] <- y
+    expect_indexed(x, c(3, 4, NA), c("L", "mg", NA))
+    expect_named(x, c("a", "b", "c"))
+
+    # A slice keeps unused dictionary entries; only used units must be castable.
+    target <- indexed_units(c(0, 0), c("L", "mg"))[integer()]
+    expect_indexed(vctrs::vec_cast(x, target), c(3, 4, NA), c("L", "mg", NA))
+    expect_named(vctrs::vec_cast(x, target), names(x))
+    expect_indexed(vctrs::vec_cast(x[c(2, 3)], indexed_units(0, "mg")),
+                   c(4, NA), c("mg", NA))
+    expect_error(vctrs::vec_cast(x, indexed_units(0, "mg")), "does not contain")
+    expect_indexed(vctrs::vec_cast(x[3], indexed_units()), NA_real_, NA_character_)
+})
+
+test_that("constructors remap aliases and recycle scalar labels", {
+    x <- indexed_units(c(1, 2, NA, 4), c("meter", "m", NA, "s"))
+    expect_indexed(x, c(1, 2, NA, 4), c("m", "m", NA, "s"))
+    expect_identical(attr(x, "unit_dictionary"), c("m", "s"))
+    expect_indexed(indexed_units(c(1, NA, 3), "mg"), c(1, NA, 3), rep("mg", 3))
+    expect_indexed(indexed_units(rep(NA_real_, 3), NA_character_), rep(NA_real_, 3), rep(NA_character_, 3))
+    expect_indexed(indexed_units(numeric(), "mg"), numeric(), character())
+})
+
+test_that("arithmetic groups IDs and merges equal result units across pairs", {
+    x <- indexed_units(c(1, 2, NA, 4, NA), c("m", "s", NA, "m", "m"))
+    y <- indexed_units(c(3, 4, 5, 6, 7), c("s", "m", "kg", "m", "s"))
+    result <- x * y
+    expected <- units::deparse_unit(units::set_units(1, m) * units::set_units(1, s))
+    expect_indexed(result, c(3, 8, NA, 24, NA), c(expected, expected, NA, "m2", expected))
+    expect_length(attr(result, "unit_dictionary"), 2)
+    expect_identical(attr(result, "unit_dictionary"), unique(indexed_unit_labels(result)[!is.na(indexed_unit_labels(result))]))
+    expect_indexed(x / x, c(1, 1, NA, 1, NA), c("1", "1", NA, "1", "1"))
+    expect_identical(x == x, c(TRUE, TRUE, NA, TRUE, NA))
+    expect_indexed(indexed_units(NA_real_, NA_character_) * x, rep(NA_real_, 5), rep(NA_character_, 5))
+    expect_indexed(x * numeric(), numeric(), character())
+})

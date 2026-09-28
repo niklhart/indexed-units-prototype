@@ -44,7 +44,7 @@ indexed_units <- function(x = double(), unit = NULL) {
     if (!is.character(unit) || !(length(unit) %in% c(1L, length(x)))) {
         stop("unit must be character with length one or length(x).", call. = FALSE)
     }
-    unit <- rep_len(unit, length(x))
+    if (!length(x)) unit <- character()
     if (any(is.na(unit) & !is.na(x))) {
         stop("An unknown unit requires a missing value.", call. = FALSE)
     }
@@ -52,9 +52,9 @@ indexed_units <- function(x = double(), unit = NULL) {
     canonical <- vapply(dictionary, function(u) {
         units::deparse_unit(units::set_units(1, u, mode = "standard"))
     }, character(1), USE.NAMES = FALSE)
-    labels <- canonical[match(unit, dictionary)]
+    id <- rep_len(match(unit, dictionary), length(x))
     dictionary <- unique(canonical)
-    .new_indexed_units(as.double(x), match(labels, dictionary), dictionary, names(x))
+    .new_indexed_units(as.double(x), match(canonical, dictionary)[id], dictionary, names(x))
 }
 
 .new_indexed_units <- function(value, id, dictionary, names = NULL) {
@@ -73,6 +73,13 @@ indexed_unit_labels <- function(x) {
     out <- unclass(x)
     attributes(out) <- if (is.null(names(x))) NULL else list(names = names(x))
     out
+}
+
+.remap_unit_ids <- function(x, dictionary) {
+    source <- attr(x, "unit_dictionary")
+    id <- attr(x, "unit_id")
+    if (identical(source, dictionary)) return(id)
+    match(source, dictionary)[id]
 }
 
 #' @export
@@ -96,10 +103,11 @@ indexed_unit_labels <- function(x) {
     value <- indexed_units(value)
     dictionary <- union(attr(x, "unit_dictionary"), attr(value, "unit_dictionary"))
     values <- .indexed_values(x)
-    ids <- match(indexed_unit_labels(x), dictionary)
+    # union() retains the existing dictionary's order, so its IDs stay valid.
+    ids <- attr(x, "unit_id")
     names(ids) <- names(x)
     values[i] <- .indexed_values(value)
-    ids[i] <- match(indexed_unit_labels(value), dictionary)
+    ids[i] <- .remap_unit_ids(value, dictionary)
     .new_indexed_units(values, ids, dictionary, names(values))
 }
 
@@ -124,7 +132,7 @@ c.IndexedUnits <- function(..., recursive = FALSE) {
     }
     dictionary <- unique(unlist(lapply(xs, attr, "unit_dictionary"), use.names = FALSE))
     value <- do.call(c, lapply(xs, .indexed_values))
-    ids <- unlist(lapply(xs, function(x) match(indexed_unit_labels(x), dictionary)), use.names = FALSE)
+    ids <- unlist(lapply(xs, .remap_unit_ids, dictionary = dictionary), use.names = FALSE)
     .new_indexed_units(value %||% double(), ids, dictionary %||% character(), names(value))
 }
 
@@ -172,23 +180,36 @@ Ops.IndexedUnits <- function(e1, e2) {
     n <- if (!n1 || !n2) 0L else max(n1, n2)
     comparison <- op %in% c("==", "!=", "<", "<=", ">", ">=")
     values <- if (comparison) rep(NA, n) else rep(NA_real_, n)
-    labels <- rep(NA_character_, n)
     a <- rep_len(.indexed_values(e1), n)
     b <- rep_len(.indexed_values(e2), n)
-    u1 <- rep_len(indexed_unit_labels(e1), n)
-    u2 <- rep_len(indexed_unit_labels(e2), n)
-    groups <- split(seq_len(n), paste(match(u1, unique(u1)), match(u2, unique(u2))))
-    for (i in groups) {
-        if (is.na(u1[i[1]]) || is.na(u2[i[1]])) next
+    d1 <- attr(e1, "unit_dictionary")
+    d2 <- attr(e2, "unit_dictionary")
+    groups <- vctrs::vec_group_loc(vctrs::new_data_frame(list(
+        left = rep_len(attr(e1, "unit_id"), n),
+        right = rep_len(attr(e2, "unit_id"), n)
+    )))
+    if (!comparison) {
+        id <- rep(NA_integer_, n)
+        labels <- rep(NA_character_, nrow(groups))
+    }
+    for (g in seq_len(nrow(groups))) {
+        left <- groups$key$left[g]
+        right <- groups$key$right[g]
+        if (is.na(left) || is.na(right)) next
+        i <- groups$loc[[g]]
         result <- do.call(op, list(
-            units::set_units(a[i], u1[i[1]], mode = "standard"),
-            units::set_units(b[i], u2[i[1]], mode = "standard")
+            units::set_units(a[i], d1[left], mode = "standard"),
+            units::set_units(b[i], d2[right], mode = "standard")
         ))
         values[i] <- as.vector(result)
-        if (!comparison) labels[i] <- units::deparse_unit(result)
+        if (!comparison) {
+            id[i] <- g
+            labels[g] <- units::deparse_unit(result)
+        }
     }
     if (comparison) return(values)
-    indexed_units(values, labels)
+    dictionary <- unique(labels[!is.na(labels)])
+    .new_indexed_units(values, match(labels, dictionary)[id], dictionary)
 }
 
 #' @export
@@ -210,7 +231,7 @@ sort.IndexedUnits <- function(x, decreasing = FALSE, ...) {
 
 #' @export
 duplicated.IndexedUnits <- function(x, incomparables = FALSE, ...) {
-    duplicated(data.frame(value = .indexed_values(x), unit = indexed_unit_labels(x)),
+    duplicated(data.frame(value = .indexed_values(x), unit = attr(x, "unit_id")),
                incomparables = incomparables, ...)
 }
 
@@ -253,7 +274,7 @@ vec_ptype2.IndexedUnits.IndexedUnits <- function(x, y, ...) {
 #' @exportS3Method vctrs::vec_cast
 vec_cast.IndexedUnits.IndexedUnits <- function(x, to, ...) {
     dictionary <- attr(to, "unit_dictionary")
-    id <- match(indexed_unit_labels(x), dictionary)
+    id <- .remap_unit_ids(x, dictionary)
     if (any(!is.na(attr(x, "unit_id")) & is.na(id))) {
         stop("Target unit dictionary does not contain all source units.", call. = FALSE)
     }

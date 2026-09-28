@@ -12,13 +12,13 @@ Cases investigated:
 - **Pipelines:** row binding, filtering with arithmetic in `mutate()`, and long/wide pivot round trips.
 - **Missing values:** a sparse pivot followed by printing, checked separately from timings.
 
-Baseline findings (10,000 elements, two balanced unit types):
+Current findings (10,000 elements, two balanced unit types):
 
-- **Much smaller storage and faster arithmetic:** about 48× less retained memory; addition with conversion was about 21× faster and scalar multiplication about 308× faster.
-- **Benefits vary by operation:** pivots were about twice as fast, row binding was similar, and replacement and concatenation were about 2–2.5× slower.
+- **Much smaller storage and faster arithmetic:** about 48× less retained memory; addition with conversion was about 19× faster and scalar multiplication about 780× faster.
+- **Benefits vary by operation:** pivots and row binding were roughly twice as fast, replacement was modestly faster, and concatenation was similar.
 - **Some behavior differs:** with `units` 1.0.1, repetition loses the `mixed_units` class and a sparse pivot fails when printed. These are not counted as speedups.
 
-Results are exploratory medians of 3–5 warm-process iterations, including garbage collection. Values and unit labels are checked before timing. Fixtures are prepared outside timings except for construction; retained memory and temporary allocations are measured separately. The package implementation is unchanged.
+Results are exploratory medians of 3–5 warm-process iterations, including garbage collection. Values and unit labels are checked before timing. Fixtures are prepared outside timings except for construction; retained memory and temporary allocations are measured separately. This run includes dictionary-level remapping and arithmetic grouped by integer unit IDs.
 
 To reproduce, install `bench`, `lobstr`, `pkgload`, `dplyr`, and `tidyr`, then run from the package root:
 
