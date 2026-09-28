@@ -1,0 +1,11 @@
+Package: indexedunits
+Title: Alternative implementation of a mixed_units class
+Version: 0.0.0.9000
+Authors@R: 
+    person("Niklas", "Hartung", , "niklas.hartung@uni-potsdam.de", role = c("aut", "cre"))
+Description: A suggested alternative implementation of the `units::mixed_units` class 
+  for handling numeric vectors with heterogeneous units in R.
+License: MIT + file LICENSE
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.3
