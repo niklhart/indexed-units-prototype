@@ -1,0 +1,261 @@
+#' Experimental numeric vectors with indexed units
+#'
+#' `IndexedUnits` stores doubles, a per-element integer unit index, and a
+#' dictionary of units. It is independent of model and simulation classes and
+#' is not a subclass of `units::mixed_units` or `units`.
+#'
+#' Subsetting, replacement, repetition, concatenation, and base data frames are
+#' supported. Optional vctrs methods support tidyr pivots without scalar
+#' list-columns. Unit dictionaries are merged without converting stored values.
+#' Missing elements introduced by indexing or reshaping have unknown units
+#' (`NA`), distinct from dimensionless values (`"1"`).
+#'
+#' Arithmetic supports unary `+`/`-`, binary `+`, `-`, `*`, `/`, and comparisons.
+#' Operations are grouped by unit pairs and delegated to `units`. Operands must
+#' have equal lengths or one must be scalar. Plain numbers are dimensionless;
+#' convert ordinary `units` operands with `indexed_units()` before arithmetic.
+#' Math functions and summaries are deliberately unsupported in this prototype.
+#' Duplicate detection and vctrs equality use the stored value and unit label,
+#' not physical equivalence across convertible units. Sorting is unsupported.
+#' This is an experimental API,
+#' not a general replacement for `units`, and has no performance guarantee yet.
+#'
+#' @param x A numeric vector, or a `units` vector when `unit` is omitted.
+#' @param unit Unit labels, scalar or matching the length of `x`. Defaults to
+#'   dimensionless (`"1"`). An unknown unit (`NA`) requires a missing value.
+#' @returns `indexed_units()` returns an `IndexedUnits` vector;
+#'   `indexed_unit_labels()` returns its per-element character unit labels.
+#' @examples
+#' x <- indexed_units(c(1, 2, 3), c("mg", "L", "mg"))
+#' x[c(3, 1)]
+#' x * 2
+#' data.frame(value = x)
+#' @export
+indexed_units <- function(x = double(), unit = NULL) {
+    if (inherits(x, "IndexedUnits") && is.null(unit)) return(x)
+    if (inherits(x, "units")) {
+        if (!is.null(unit)) stop("Omit unit when converting a units vector.", call. = FALSE)
+        unit <- units::deparse_unit(x)
+    }
+    if (!is.numeric(x) || !is.null(dim(x)) || is.complex(x)) {
+        stop("x must be a numeric vector.", call. = FALSE)
+    }
+    if (is.null(unit)) unit <- "1"
+    if (!is.character(unit) || !(length(unit) %in% c(1L, length(x)))) {
+        stop("unit must be character with length one or length(x).", call. = FALSE)
+    }
+    unit <- rep_len(unit, length(x))
+    if (any(is.na(unit) & !is.na(x))) {
+        stop("An unknown unit requires a missing value.", call. = FALSE)
+    }
+    dictionary <- unique(unit[!is.na(unit)])
+    canonical <- vapply(dictionary, function(u) {
+        units::deparse_unit(units::set_units(1, u, mode = "standard"))
+    }, character(1), USE.NAMES = FALSE)
+    labels <- canonical[match(unit, dictionary)]
+    dictionary <- unique(canonical)
+    .new_indexed_units(as.double(x), match(labels, dictionary), dictionary, names(x))
+}
+
+.new_indexed_units <- function(value, id, dictionary, names = NULL) {
+    structure(value, unit_id = as.integer(id), unit_dictionary = dictionary,
+              names = names, class = "IndexedUnits")
+}
+
+#' @rdname indexed_units
+#' @export
+indexed_unit_labels <- function(x) {
+    .check_class(x, "IndexedUnits")
+    attr(x, "unit_dictionary")[attr(x, "unit_id")]
+}
+
+.indexed_values <- function(x) {
+    out <- unclass(x)
+    attributes(out) <- if (is.null(names(x))) NULL else list(names = names(x))
+    out
+}
+
+#' @export
+`[.IndexedUnits` <- function(x, i, ...) {
+    value <- .indexed_values(x)[i]
+    ids <- attr(x, "unit_id")
+    names(ids) <- names(x)
+    .new_indexed_units(value, ids[i], attr(x, "unit_dictionary"), names(value))
+}
+
+#' @export
+`[[.IndexedUnits` <- function(x, i, ...) {
+    value <- .indexed_values(x)[[i]]
+    ids <- attr(x, "unit_id")
+    names(ids) <- names(x)
+    .new_indexed_units(value, ids[[i]], attr(x, "unit_dictionary"))
+}
+
+#' @export
+`[<-.IndexedUnits` <- function(x, i, value) {
+    value <- indexed_units(value)
+    dictionary <- union(attr(x, "unit_dictionary"), attr(value, "unit_dictionary"))
+    values <- .indexed_values(x)
+    ids <- match(indexed_unit_labels(x), dictionary)
+    names(ids) <- names(x)
+    values[i] <- .indexed_values(value)
+    ids[i] <- match(indexed_unit_labels(value), dictionary)
+    .new_indexed_units(values, ids, dictionary, names(values))
+}
+
+#' @export
+`[[<-.IndexedUnits` <- function(x, i, value) {
+    if (length(i) != 1L || length(value) != 1L) {
+        stop("[[ replacement requires one index and one value.", call. = FALSE)
+    }
+    x[i] <- value
+    x
+}
+
+#' @export
+rep.IndexedUnits <- function(x, ...) x[rep(seq_along(x), ...)]
+
+#' @export
+c.IndexedUnits <- function(..., recursive = FALSE) {
+    if (recursive) stop("Recursive concatenation is not supported.", call. = FALSE)
+    xs <- Filter(Negate(is.null), list(...))
+    if (!all(vapply(xs, inherits, logical(1), "IndexedUnits"))) {
+        stop("All inputs must be IndexedUnits vectors.", call. = FALSE)
+    }
+    dictionary <- unique(unlist(lapply(xs, attr, "unit_dictionary"), use.names = FALSE))
+    value <- do.call(c, lapply(xs, .indexed_values))
+    ids <- unlist(lapply(xs, function(x) match(indexed_unit_labels(x), dictionary)), use.names = FALSE)
+    .new_indexed_units(value %||% double(), ids, dictionary %||% character(), names(value))
+}
+
+#' @export
+as.double.IndexedUnits <- function(x, ...) as.double(.indexed_values(x))
+
+#' @export
+as.data.frame.IndexedUnits <- function(x, row.names = NULL, optional = FALSE, ...) {
+    out <- data.frame(value = .indexed_values(x), row.names = row.names)
+    out[[1]] <- x
+    names(out) <- if (optional) NULL else deparse(substitute(x))
+    out
+}
+
+#' @export
+format.IndexedUnits <- function(x, ...) {
+    paste0(format(.indexed_values(x), ...), " [", indexed_unit_labels(x), "]")
+}
+
+#' @export
+print.IndexedUnits <- function(x, ...) {
+    cat("IndexedUnits (experimental):\n")
+    print(format(x, ...), quote = FALSE)
+    invisible(x)
+}
+
+#' @export
+Ops.IndexedUnits <- function(e1, e2) {
+    op <- .Generic
+    if (missing(e2)) {
+        if (!op %in% c("+", "-")) stop("Operation not supported: ", op, call. = FALSE)
+        return(.new_indexed_units(do.call(op, list(.indexed_values(e1))),
+            attr(e1, "unit_id"), attr(e1, "unit_dictionary"), names(e1)))
+    }
+    if (!op %in% c("+", "-", "*", "/", "==", "!=", "<", "<=", ">", ">=")) {
+        stop("Operation not supported: ", op, call. = FALSE)
+    }
+    e1 <- indexed_units(e1)
+    e2 <- indexed_units(e2)
+    n1 <- length(e1)
+    n2 <- length(e2)
+    if (n1 != n2 && n1 != 1L && n2 != 1L && n1 && n2) {
+        stop("Operands must have equal lengths or one must be scalar.", call. = FALSE)
+    }
+    n <- if (!n1 || !n2) 0L else max(n1, n2)
+    comparison <- op %in% c("==", "!=", "<", "<=", ">", ">=")
+    values <- if (comparison) rep(NA, n) else rep(NA_real_, n)
+    labels <- rep(NA_character_, n)
+    a <- rep_len(.indexed_values(e1), n)
+    b <- rep_len(.indexed_values(e2), n)
+    u1 <- rep_len(indexed_unit_labels(e1), n)
+    u2 <- rep_len(indexed_unit_labels(e2), n)
+    groups <- split(seq_len(n), paste(match(u1, unique(u1)), match(u2, unique(u2))))
+    for (i in groups) {
+        if (is.na(u1[i[1]]) || is.na(u2[i[1]])) next
+        result <- do.call(op, list(
+            units::set_units(a[i], u1[i[1]], mode = "standard"),
+            units::set_units(b[i], u2[i[1]], mode = "standard")
+        ))
+        values[i] <- as.vector(result)
+        if (!comparison) labels[i] <- units::deparse_unit(result)
+    }
+    if (comparison) return(values)
+    indexed_units(values, labels)
+}
+
+#' @export
+Math.IndexedUnits <- function(x, ...) stop("Math operation not supported: ", .Generic, call. = FALSE)
+
+#' @export
+Summary.IndexedUnits <- function(..., na.rm = FALSE) stop("Summary operation not supported: ", .Generic, call. = FALSE)
+
+#' @export
+mean.IndexedUnits <- function(x, ...) stop("Mean is not supported for IndexedUnits.", call. = FALSE)
+
+#' @export
+xtfrm.IndexedUnits <- function(x) stop("Sorting is not supported for IndexedUnits.", call. = FALSE)
+
+#' @export
+sort.IndexedUnits <- function(x, decreasing = FALSE, ...) {
+    stop("Sorting is not supported for IndexedUnits.", call. = FALSE)
+}
+
+#' @export
+duplicated.IndexedUnits <- function(x, incomparables = FALSE, ...) {
+    duplicated(data.frame(value = .indexed_values(x), unit = indexed_unit_labels(x)),
+               incomparables = incomparables, ...)
+}
+
+#' @export
+unique.IndexedUnits <- function(x, incomparables = FALSE, ...) {
+    x[!duplicated(x, incomparables = incomparables, ...)]
+}
+
+#' @export
+anyDuplicated.IndexedUnits <- function(x, incomparables = FALSE, ...) {
+    indices <- which(duplicated(x, incomparables = incomparables, ...))
+    if (length(indices)) indices[1L] else 0L
+}
+
+#' @exportS3Method vctrs::vec_proxy
+vec_proxy.IndexedUnits <- function(x, ...) {
+    vctrs::new_data_frame(list(value = .indexed_values(x), unit_id = attr(x, "unit_id")))
+}
+
+#' @exportS3Method vctrs::vec_proxy_equal
+vec_proxy_equal.IndexedUnits <- function(x, ...) {
+    vctrs::new_data_frame(list(value = .indexed_values(x), unit = indexed_unit_labels(x)))
+}
+
+#' @exportS3Method vctrs::vec_proxy_compare
+vec_proxy_compare.IndexedUnits <- function(x, ...) {
+    stop("Ordering is not supported for IndexedUnits.", call. = FALSE)
+}
+
+#' @exportS3Method vctrs::vec_restore
+vec_restore.IndexedUnits <- function(x, to, ...) {
+    .new_indexed_units(x$value, x$unit_id, attr(to, "unit_dictionary"))
+}
+
+#' @exportS3Method vctrs::vec_ptype2
+vec_ptype2.IndexedUnits.IndexedUnits <- function(x, y, ...) {
+    .new_indexed_units(double(), integer(), union(attr(x, "unit_dictionary"), attr(y, "unit_dictionary")))
+}
+
+#' @exportS3Method vctrs::vec_cast
+vec_cast.IndexedUnits.IndexedUnits <- function(x, to, ...) {
+    dictionary <- attr(to, "unit_dictionary")
+    id <- match(indexed_unit_labels(x), dictionary)
+    if (any(!is.na(attr(x, "unit_id")) & is.na(id))) {
+        stop("Target unit dictionary does not contain all source units.", call. = FALSE)
+    }
+    .new_indexed_units(.indexed_values(x), id, dictionary, names(x))
+}
