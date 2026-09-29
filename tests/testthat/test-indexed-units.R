@@ -26,7 +26,7 @@ test_that("base indexing, repetition, concatenation and replacement keep units a
     x <- indexed_units(c(a = 1, b = 2), c("mg", "L"))
     expect_indexed(x[c(2, 1, 2)], c(2, 1, 2), c("L", "mg", "L"))
     expect_indexed(x["b"], 2, "L")
-    expect_indexed(x[[2]], 2, "L")
+    expect_equal(x[[2]], units::set_units(2, L))
     expect_indexed(x[c(1, NA, 3)], c(1, NA, NA), c("mg", NA, NA))
     expect_indexed(rep(x, each = 2), c(1, 1, 2, 2), c("mg", "mg", "L", "L"))
     expect_indexed(c(x, indexed_units(3, "s")), c(1, 2, 3), c("mg", "L", "s"))
@@ -133,6 +133,35 @@ test_that("constructors remap aliases and recycle scalar labels", {
     expect_indexed(indexed_units(c(1, NA, 3), "mg"), c(1, NA, 3), rep("mg", 3))
     expect_indexed(indexed_units(rep(NA_real_, 3), NA_character_), rep(NA_real_, 3), rep(NA_character_, 3))
     expect_indexed(indexed_units(numeric(), "mg"), numeric(), character())
+})
+
+test_that("scalar numeric values recycle like mixed_units", {
+    for (value in list(5, c(a = 5), NA_real_)) {
+        unit <- c("m", "ft", "m")
+        x <- indexed_units(value, unit)
+        reference <- units::mixed_units(value, unit)
+        expect_indexed(x, as.numeric(reference), unit)
+        expect_identical(names(x), names(reference))
+    }
+    expect_indexed(indexed_units(NA_real_, c("m", NA)), c(NA_real_, NA_real_), c("m", NA))
+    expect_indexed(indexed_units(5, character()), numeric(), character())
+    expect_error(indexed_units(5, c("m", NA)), "missing")
+})
+
+test_that("scalar extraction returns units or NULL like mixed_units", {
+    x <- indexed_units(c(a = 1, b = NA_real_), c("m", "s"))
+    reference <- units::mixed_units(c(a = 1, b = NA_real_), c("m", "s"))
+    for (i in list(1L, 2L, "a", "b", "absent", NA_integer_)) {
+        expect_identical(x[[i]], reference[[i]])
+    }
+    expect_identical(x[c(1, NA, 3)][[2]], reference[c(1, NA, 3)][[2]])
+    expect_null(indexed_units(NA_real_, NA_character_)[[1]])
+    expect_error(x[[3]], "out of bounds")
+    expect_indexed(x[1], 1, "m")
+    x[] <- x[[1]]
+    expect_indexed(x, c(1, 1), c("m", "m"))
+    x[[2]] <- units::set_units(3, s)
+    expect_indexed(x, c(1, 3), c("m", "s"))
 })
 
 test_that("arithmetic groups IDs and merges equal result units across pairs", {

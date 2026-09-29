@@ -9,6 +9,8 @@
 #' list-columns. Unit dictionaries are merged without converting stored values.
 #' Missing elements introduced by indexing or reshaping have unknown units
 #' (`NA`), distinct from dimensionless values (`"1"`).
+#' Scalar extraction with `[[` returns an ordinary `units` object, or `NULL`
+#' for an element with an unknown unit, matching missing `mixed_units` elements.
 #'
 #' Arithmetic supports unary `+`/`-`, binary `+`, `-`, `*`, `/`, and comparisons.
 #' Operations are grouped by unit pairs and delegated to `units`. Operands must
@@ -21,8 +23,9 @@
 #' not a general replacement for `units`, and has no performance guarantee yet.
 #'
 #' @param x A numeric vector, or a `units` vector when `unit` is omitted.
-#' @param unit Unit labels, scalar or matching the length of `x`. Defaults to
-#'   dimensionless (`"1"`). An unknown unit (`NA`) requires a missing value.
+#' @param unit Unit labels, scalar or matching the length of `x`. A scalar `x`
+#'   is recycled to the length of `unit`, as in `units::mixed_units()`.
+#'   Defaults to dimensionless (`"1"`). An unknown unit (`NA`) requires a missing value.
 #' @returns `indexed_units()` returns an `IndexedUnits` vector;
 #'   `indexed_unit_labels()` returns its per-element character unit labels.
 #' @examples
@@ -41,8 +44,14 @@ indexed_units <- function(x = double(), unit = NULL) {
         stop("x must be a numeric vector.", call. = FALSE)
     }
     if (is.null(unit)) unit <- "1"
-    if (!is.character(unit) || !(length(unit) %in% c(1L, length(x)))) {
-        stop("unit must be character with length one or length(x).", call. = FALSE)
+    if (!is.character(unit) || !(length(x) == 1L || length(unit) %in% c(1L, length(x)))) {
+        stop("unit must be character; x or unit must have length one, or their lengths must match.", call. = FALSE)
+    }
+    if (length(x) == 1L && length(unit) != 1L) {
+        nm <- names(x)
+        x <- rep_len(as.double(x), length(unit))
+        # mixed_units retains the original name and pads further names with NA.
+        if (length(x) && !is.null(nm)) names(x) <- nm
     }
     if (!length(x)) unit <- character()
     if (any(is.na(unit) & !is.na(x))) {
@@ -92,10 +101,14 @@ indexed_unit_labels <- function(x) {
 
 #' @export
 `[[.IndexedUnits` <- function(x, i, ...) {
+    if (length(i) == 1L && (is.na(i) ||
+        (is.character(i) && (i == "" || is.na(match(i, names(x))))))) return(NULL)
     value <- .indexed_values(x)[[i]]
     ids <- attr(x, "unit_id")
     names(ids) <- names(x)
-    .new_indexed_units(value, ids[[i]], attr(x, "unit_dictionary"))
+    id <- ids[[i]]
+    if (is.na(id)) return(NULL)
+    units::set_units(value, attr(x, "unit_dictionary")[[id]], mode = "standard")
 }
 
 #' @export

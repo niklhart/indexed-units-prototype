@@ -12,8 +12,9 @@ indexed_unit_labels(x)
 \arguments{
 \item{x}{A numeric vector, or a \code{units} vector when \code{unit} is omitted.}
 
-\item{unit}{Unit labels, scalar or matching the length of \code{x}. Defaults to
-dimensionless (\code{"1"}). An unknown unit (\code{NA}) requires a missing value.}
+\item{unit}{Unit labels, scalar or matching the length of \code{x}. A scalar \code{x}
+is recycled to the length of \code{unit}, as in \code{units::mixed_units()}.
+Defaults to dimensionless (\code{"1"}). An unknown unit (\code{NA}) requires a missing value.}
 }
 \value{
 \code{indexed_units()} returns an \code{IndexedUnits} vector;
@@ -30,6 +31,8 @@ supported. Optional vctrs methods support tidyr pivots without scalar
 list-columns. Unit dictionaries are merged without converting stored values.
 Missing elements introduced by indexing or reshaping have unknown units
 (\code{NA}), distinct from dimensionless values (\code{"1"}).
+Scalar extraction with \code{[[} returns an ordinary \code{units} object, or \code{NULL}
+for an element with an unknown unit, matching missing \code{mixed_units} elements.
 
 Arithmetic supports unary \code{+}/\code{-}, binary \code{+}, \code{-}, \code{*}, \code{/}, and comparisons.
 Operations are grouped by unit pairs and delegated to \code{units}. Operands must
