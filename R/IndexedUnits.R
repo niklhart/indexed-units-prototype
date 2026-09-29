@@ -8,8 +8,9 @@
 #' supported. Optional vctrs methods support tidyr pivots without scalar
 #' list-columns. Unit dictionaries are merged without converting stored values.
 #' Subsetting, replacement, and reshaping remove unused dictionary entries,
-#' except for empty vectors or vectors whose unit IDs are all unknown. These
-#' retain their dictionary so reshaping can fill missing buffers safely.
+#' except for nonempty vectors whose unit IDs are all unknown. These retain
+#' their dictionary so reshaping can fill missing buffers safely. Empty subsets
+#' have empty dictionaries; internal type prototypes retain available unit types.
 #' Missing elements introduced by indexing or reshaping have unknown units
 #' (`NA`), distinct from dimensionless values (`"1"`).
 #' Scalar extraction with `[[` returns an ordinary `units` object, or `NULL`
@@ -78,7 +79,7 @@ indexed_units <- function(x = double(), unit = NULL) {
 
 .compact_indexed_units <- function(value, id, dictionary, names = NULL) {
     used <- which(tabulate(id, nbins = length(dictionary)) > 0L)
-    if (length(used) && length(used) != length(dictionary)) {
+    if ((!length(id) || length(used)) && length(used) != length(dictionary)) {
         id <- match(id, used)
         dictionary <- dictionary[used]
     }

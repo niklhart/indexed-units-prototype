@@ -151,7 +151,7 @@ test_that("subsetting removes unused dictionary entries and remaps IDs", {
         expect_identical(unname(attr(y, "unit_id")), c(2L, 1L, 2L, NA_integer_))
         expect_identical(attr(slice(1), "unit_dictionary"), "mg")
         expect_identical(attr(slice(2), "unit_dictionary"), "L")
-        expect_identical(attr(slice(integer()), "unit_dictionary"), attr(x, "unit_dictionary"))
+        expect_identical(attr(slice(integer()), "unit_dictionary"), character())
         expect_identical(attr(slice(c(4, NA_integer_)), "unit_dictionary"), attr(x, "unit_dictionary"))
     }
     expect_named(x[c("c", "b")], c("c", "b"))
