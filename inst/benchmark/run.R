@@ -191,7 +191,7 @@ if (any(vapply(statuses, function(x) x$status == "failed", logical(1)))) {
 
 # Issue-ready figures; the full grid remains available in the CSV files.
 library(ggplot2)
-plot_data <- subset(do.call(rbind, timings), k == 2 & distribution == "balanced_shuffled")
+plot_data <- subset(do.call(rbind, timings), k == 8 & distribution == "balanced_shuffled")
 workload_labels <- c(construct = "Construction", convert_units = "Explicit conversion*",
     slice = "Slicing", replace = "Replacement", concatenate = "Concatenation",
     scale = "Scalar multiplication", add_same = "Addition: same units",
@@ -204,7 +204,7 @@ p <- ggplot(plot_data, aes(n, median_seconds * 1000, colour = implementation)) +
     scale_y_log10() + scale_colour_manual(values = c(IndexedUnits = "#0072B2", mixed_units = "#D55E00")) +
     facet_wrap(~workload, ncol = 3, scales = "free_y") +
     labs(title = "IndexedUnits and mixed_units",
-         subtitle = paste0("Two balanced, shuffled unit types | units ", units_version$Version,
+         subtitle = paste0("Eight balanced, shuffled unit types | units ", units_version$Version,
                            " (", substr(units_version$RemoteSha %||% "CRAN", 1, 7), ")"),
          x = "Number of elements (log scale)", y = "Median elapsed time, ms (log scale; panel-specific ranges)",
          colour = NULL,
@@ -233,7 +233,7 @@ m <- ggplot(memory_data, aes(n, bytes / 1024, colour = implementation)) +
                            " (", substr(units_version$RemoteSha %||% "CRAN", 1, 7), ")"),
          x = "Number of elements (log scale)", y = "Memory, KiB (log scale; panel-specific ranges)",
          colour = NULL,
-         caption = "Top row: retained object-size estimates (lobstr, including shared metadata).\nOther rows: profiler-reported allocation (bench), two unit types; not peak memory.\nSmall-object allocations are undercounted, favoring mixed_units; these are not total allocation estimates.\n*Explicit conversion: mixed_units only. Repetition loses the mixed_units class and is not measured.") +
+         caption = "Top row: retained object-size estimates (lobstr, including shared metadata).\nOther rows: profiler-reported allocation (bench), eight unit types; not peak memory.\nSmall-object allocations are undercounted, favoring mixed_units; these are not total allocation estimates.\n*Explicit conversion: mixed_units only. Repetition loses the mixed_units class and is not measured.") +
     theme_bw(base_size = 11) + theme(legend.position = "top", plot.caption = element_text(hjust = 0))
 ggsave(file.path(out, "memory.png"), m, width = 12, height = 12, dpi = 180, bg = "white")
 message("Done. Measurements saved in inst/benchmark/results/.")

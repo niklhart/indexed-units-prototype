@@ -1,7 +1,7 @@
 # IndexedUnits vs mixed_units
 
-This benchmark compares the current prototype with `units::mixed_units`.
-The current run uses GitHub `units` **1.0-1.6**, revision
+This benchmark compares `IndexedUnits` with `units::mixed_units`
+from GitHub `units` **1.0-1.6**, revision
 [`a823fef`](https://github.com/r-quantities/units/commit/a823fef46d92ee4e1b2e2fa28ddf4c19d67cefb6), pinned in `renv.lock`.
 
 Cases investigated:
@@ -15,16 +15,30 @@ Cases investigated:
 - **Pipelines:** row binding, filtering with arithmetic in `mutate()`, and long/wide pivot round trips.
 - **Missing values:** a sparse pivot followed by printing, checked separately from timings.
 
-Current findings (10,000 elements, two balanced unit types):
+Findings (10,000 elements, eight balanced/shuffled unit types):
 
-- **Much smaller storage and faster arithmetic:** about 15× less retained memory; addition with conversion was about 800× faster and scalar multiplication about 970× faster.
-- **Factor proxies recover pipeline performance:** compared with the previous character proxy, row binding fell from 1.17 to 0.45 ms and pivots from 6.40 to 3.86 ms. Both are faster than `mixed_units` again (0.72 and 5.01 ms). Slicing and concatenation remain slower.
-- **Less reported allocation:** row binding fell from 3.81 to 1.36 MB and pivots from 12.19 to 5.64 MB. These are profiler-reported allocations, not total memory use; small-object allocations are undercounted, favoring `mixed_units`.
-- **Some behavior differs:** repetition still loses the `mixed_units` class and a sparse pivot fails when printed. These are not counted as speedups.
+- **Compact storage and faster arithmetic:** `IndexedUnits` uses about 15× less retained memory than `mixed_units`; addition with conversion is about 318× faster and scalar multiplication about 400× faster.
+- **Unit diversity matters:** `IndexedUnits` multiplication is about 41× faster than `mixed_units` with 64 unit pairs, compared with 399× faster with four pairs in the two-type case.
+- **Pipelines:** `IndexedUnits` row binding takes 0.43 ms versus 0.72 ms for `mixed_units`; pivots take 3.87 ms versus 5.84 ms. Concatenation is slower for `IndexedUnits`; slicing and replacement are close in absolute time.
+- **Memory measurement:** `IndexedUnits` row binding and pivots report 1.36 MB and 5.64 MB of allocations, versus 1.04 MB and 3.72 MB for `mixed_units`. Small-object allocations are undercounted, favoring `mixed_units`; these are not total memory-use estimates.
+- **Some behavior differs:** `mixed_units` loses its class under repetition, and its sparse pivot result fails when printed. `IndexedUnits` supports both cases. These are not counted as speedups.
 
-Results are exploratory medians of 3–5 warm-process iterations, including garbage collection. Values and unit labels are checked before timing. Fixtures are prepared outside timings except for construction; retained memory and temporary allocations are measured separately. This run uses integer IDs with factor levels during reshaping, retaining dictionaries for nonempty unknown-unit buffers and internal prototypes. Small timing differences should be treated cautiously given the few iterations.
+Two-type comparison at the same length (speedup = `mixed_units` time / `IndexedUnits` time):
 
-The runtime figure shows the two-unit, balanced/shuffled cases. The memory figure's top row shows retained object size for 1, 2, and 8 unit types; the remaining panels show profiler-reported allocations per operation with two unit types. These allocations are not peak memory. Each panel has its own logarithmic scale. The full grid is in the raw results.
+| Operation | Eight types (main) | Two types |
+|---|---:|---:|
+| Construction | 30× | 65× |
+| Scalar multiplication | 400× | 974× |
+| Addition with conversion | 318× | 798× |
+| Multiplication across unit pairs | 41× | 399× |
+| Row binding | 1.7× | 1.6× |
+| Pivot round trip | 1.5× | 1.3× |
+
+`IndexedUnits` retained storage is about 15× smaller than `mixed_units` in both cases. Eight types represent the intended use case of many values sharing relatively few units.
+
+Results are exploratory medians of 3–5 warm-process iterations, including garbage collection. Values and unit labels are checked before timing. Fixtures are prepared outside timings except for construction; retained memory and temporary allocations are measured separately. Small timing differences should be treated cautiously given the few iterations.
+
+The runtime figure shows the eight-unit, balanced/shuffled cases. The memory figure's top row shows retained object size for 1, 2, and 8 unit types; the remaining panels show profiler-reported allocations per operation with eight unit types. These allocations are not peak memory. Each panel has its own logarithmic scale. The full grid is in the raw results.
 
 ![Runtime comparison, including explicit unit conversion](results/runtime.png)
 
