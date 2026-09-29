@@ -158,6 +158,9 @@ capture.output({
 capture.output({
     cat("Seed: 20260928\nRun:", format(Sys.time()), "\n")
     cat("Git revision:", system2("git", c("rev-parse", "HEAD"), stdout = TRUE), "\n")
+    units_version <- packageDescription("units")
+    cat("units version:", units_version$Version, "\n")
+    cat("units GitHub revision:", units_version$RemoteSha %||% "CRAN release", "\n")
     cat("Working tree:\n", system2("git", c("status", "--short"), stdout = TRUE), sep = "\n")
     cat("\nUDUNITS database:", system.file("share/udunits/udunits2.xml", package = "units"), "\n")
     print(sessionInfo())

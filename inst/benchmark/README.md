@@ -1,6 +1,8 @@
 # IndexedUnits vs mixed_units
 
 This benchmark compares the current prototype with `units::mixed_units`.
+The current run uses GitHub `units` **1.0-1.6**, revision
+[`a823fef`](https://github.com/r-quantities/units/commit/a823fef46d92ee4e1b2e2fa28ddf4c19d67cefb6), pinned in `renv.lock`.
 
 Cases investigated:
 
@@ -14,15 +16,16 @@ Cases investigated:
 
 Current findings (10,000 elements, two balanced unit types):
 
-- **Much smaller storage and faster arithmetic:** about 48× less retained memory; addition with conversion was about 19× faster and scalar multiplication about 780× faster.
-- **Benefits vary by operation:** pivots and row binding were roughly twice as fast, replacement was modestly faster, and concatenation was similar.
-- **Some behavior differs:** with `units` 1.0.1, repetition loses the `mixed_units` class and a sparse pivot fails when printed. These are not counted as speedups.
+- **Much smaller storage and faster arithmetic:** about 15× less retained memory; addition with conversion was about 810× faster and scalar multiplication about 850× faster.
+- **Benefits vary by operation:** pivots, row binding, and replacement were faster, while concatenation was slightly slower.
+- **Some behavior differs:** repetition still loses the `mixed_units` class and a sparse pivot fails when printed. These are not counted as speedups.
 
 Results are exploratory medians of 3–5 warm-process iterations, including garbage collection. Values and unit labels are checked before timing. Fixtures are prepared outside timings except for construction; retained memory and temporary allocations are measured separately. This run includes dictionary-level remapping and arithmetic grouped by integer unit IDs.
 
-To reproduce, install `bench`, `lobstr`, `pkgload`, `dplyr`, and `tidyr`, then run from the package root:
+To reproduce, run from the package root (see the [project README](../../README.md) for the UDUNITS system dependency):
 
 ```sh
+Rscript -e 'renv::restore()'
 Rscript inst/benchmark/run.R
 ```
 
