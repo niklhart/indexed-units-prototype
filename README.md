@@ -19,9 +19,9 @@ data.frame(value = x)
 
 Against GitHub `units` 1.0-1.6, the benchmark case with 10,000 elements and two
 unit types used about **15× less retained memory** and showed large arithmetic
-speedups. Dictionary cleanup adds overhead: slicing, replacement, concatenation,
-row binding, and pivots were slower, and most operations allocated more temporary
-memory. See the
+speedups. Factor proxies also make row binding and pivots faster in this case;
+slicing and concatenation remain slower. Allocation measurements undercount small
+objects and should not be interpreted as total memory use. See the
 [benchmark summary and figures](inst/benchmark/README.md) for checked results
 and measurement limitations.
 

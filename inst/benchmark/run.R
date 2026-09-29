@@ -233,7 +233,7 @@ m <- ggplot(memory_data, aes(n, bytes / 1024, colour = implementation)) +
                            " (", substr(units_version$RemoteSha %||% "CRAN", 1, 7), ")"),
          x = "Number of elements (log scale)", y = "Memory, KiB (log scale; panel-specific ranges)",
          colour = NULL,
-         caption = "Top row: retained object-size estimates (lobstr, including shared metadata).\nOther rows: cumulative allocation per operation (bench), with two unit types; not peak memory or retained size.\n*Explicit conversion: mixed_units only. Repetition loses the mixed_units class and is not measured.") +
+         caption = "Top row: retained object-size estimates (lobstr, including shared metadata).\nOther rows: profiler-reported allocation (bench), two unit types; not peak memory.\nSmall-object allocations are undercounted, favoring mixed_units; these are not total allocation estimates.\n*Explicit conversion: mixed_units only. Repetition loses the mixed_units class and is not measured.") +
     theme_bw(base_size = 11) + theme(legend.position = "top", plot.caption = element_text(hjust = 0))
 ggsave(file.path(out, "memory.png"), m, width = 12, height = 12, dpi = 180, bg = "white")
 message("Done. Measurements saved in inst/benchmark/results/.")

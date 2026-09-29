@@ -17,14 +17,14 @@ Cases investigated:
 
 Current findings (10,000 elements, two balanced unit types):
 
-- **Much smaller storage and faster arithmetic:** about 15× less retained memory; addition with conversion was about 840× faster and scalar multiplication about 950× faster.
-- **Dictionary cleanup has a cost:** replacement, row binding, and pivots now take about 4.1×, 2.5×, and 1.7× their previous runtimes. These operations, slicing, and concatenation were slower than `mixed_units` in this run.
-- **Storage and allocations differ:** despite smaller retained objects, most `IndexedUnits` operations allocate more temporary memory; the pivot round trip allocated about 12.2 MB versus 3.7 MB.
+- **Much smaller storage and faster arithmetic:** about 15× less retained memory; addition with conversion was about 800× faster and scalar multiplication about 970× faster.
+- **Factor proxies recover pipeline performance:** compared with the previous character proxy, row binding fell from 1.17 to 0.45 ms and pivots from 6.40 to 3.86 ms. Both are faster than `mixed_units` again (0.72 and 5.01 ms). Slicing and concatenation remain slower.
+- **Less reported allocation:** row binding fell from 3.81 to 1.36 MB and pivots from 12.19 to 5.64 MB. These are profiler-reported allocations, not total memory use; small-object allocations are undercounted, favoring `mixed_units`.
 - **Some behavior differs:** repetition still loses the `mixed_units` class and a sparse pivot fails when printed. These are not counted as speedups.
 
-Results are exploratory medians of 3–5 warm-process iterations, including garbage collection. Values and unit labels are checked before timing. Fixtures are prepared outside timings except for construction; retained memory and temporary allocations are measured separately. This run includes dictionary cleanup after subsetting and reshaping, alongside dictionary-level remapping and arithmetic grouped by integer unit IDs.
+Results are exploratory medians of 3–5 warm-process iterations, including garbage collection. Values and unit labels are checked before timing. Fixtures are prepared outside timings except for construction; retained memory and temporary allocations are measured separately. This run uses integer IDs with factor levels during reshaping, retaining dictionaries for nonempty unknown-unit buffers and internal prototypes. Small timing differences should be treated cautiously given the few iterations.
 
-The runtime figure shows the two-unit, balanced/shuffled cases. The memory figure's top row shows retained object size for 1, 2, and 8 unit types; the remaining panels show allocations per operation with two unit types. These allocations are not peak memory. Each panel has its own logarithmic scale. The full grid is in the raw results.
+The runtime figure shows the two-unit, balanced/shuffled cases. The memory figure's top row shows retained object size for 1, 2, and 8 unit types; the remaining panels show profiler-reported allocations per operation with two unit types. These allocations are not peak memory. Each panel has its own logarithmic scale. The full grid is in the raw results.
 
 ![Runtime comparison, including explicit unit conversion](results/runtime.png)
 
