@@ -189,7 +189,7 @@ if (any(vapply(statuses, function(x) x$status == "failed", logical(1)))) {
     stop("Some correctness checks failed; see statuses.csv. Failed workloads were not timed.")
 }
 
-# One issue-ready figure; the full grid remains available in the CSV files.
+# Issue-ready figures; the full grid remains available in the CSV files.
 library(ggplot2)
 plot_data <- subset(do.call(rbind, timings), k == 2 & distribution == "balanced_shuffled")
 workload_labels <- c(construct = "Construction", convert_units = "Explicit conversion*",
@@ -211,4 +211,29 @@ p <- ggplot(plot_data, aes(n, median_seconds * 1000, colour = implementation)) +
          caption = "3–5 timed iterations, including GC. Values and unit labels checked before timing.\n*Explicit conversion: mixed_units only; IndexedUnits has no conversion API.\nRepetition loses the mixed_units class and is not timed.") +
     theme_bw(base_size = 11) + theme(legend.position = "top", plot.caption = element_text(hjust = 0))
 ggsave(file.path(out, "runtime.png"), p, width = 12, height = 10, dpi = 180, bg = "white")
+
+# Distinguish retained storage from cumulative allocation during an operation.
+storage <- subset(do.call(rbind, sizes), distribution == "balanced_shuffled")
+storage_labels <- c("Retained size: 1 unit", "Retained size: 2 units", "Retained size: 8 units")
+memory_data <- rbind(
+    data.frame(n = storage$n, implementation = storage$implementation, bytes = storage$bytes,
+               panel = paste0("Retained size: ", storage$k, ifelse(storage$k == 1, " unit", " units"))),
+    data.frame(n = plot_data$n, implementation = plot_data$implementation, bytes = plot_data$allocated_bytes,
+               panel = paste0("Allocated: ", as.character(plot_data$workload)))
+)
+memory_data$panel <- factor(memory_data$panel,
+    levels = c(storage_labels, paste0("Allocated: ", unname(workload_labels))))
+m <- ggplot(memory_data, aes(n, bytes / 1024, colour = implementation)) +
+    geom_line(linewidth = 0.7) + geom_point(size = 2) +
+    scale_x_log10(breaks = lengths, labels = c("100", "1,000", "10,000")) +
+    scale_y_log10() + scale_colour_manual(values = c(IndexedUnits = "#0072B2", mixed_units = "#D55E00")) +
+    facet_wrap(~panel, ncol = 3, scales = "free_y") +
+    labs(title = "IndexedUnits and mixed_units: memory",
+         subtitle = paste0("Balanced, shuffled units | units ", units_version$Version,
+                           " (", substr(units_version$RemoteSha %||% "CRAN", 1, 7), ")"),
+         x = "Number of elements (log scale)", y = "Memory, KiB (log scale; panel-specific ranges)",
+         colour = NULL,
+         caption = "Top row: retained object-size estimates (lobstr, including shared metadata).\nOther rows: cumulative allocation per operation (bench), with two unit types; not peak memory or retained size.\n*Explicit conversion: mixed_units only. Repetition loses the mixed_units class and is not measured.") +
+    theme_bw(base_size = 11) + theme(legend.position = "top", plot.caption = element_text(hjust = 0))
+ggsave(file.path(out, "memory.png"), m, width = 12, height = 12, dpi = 180, bg = "white")
 message("Done. Measurements saved in inst/benchmark/results/.")

@@ -19,8 +19,10 @@ data.frame(value = x)
 
 Against GitHub `units` 1.0-1.6, the benchmark case with 10,000 elements and two
 unit types used about **15× less retained memory** and showed large arithmetic
-speedups. Gains vary by operation; concatenation was slightly slower. See the
-[benchmark summary and figure](inst/benchmark/README.md) for checked results
+speedups. Dictionary cleanup adds overhead: slicing, replacement, concatenation,
+row binding, and pivots were slower, and most operations allocated more temporary
+memory. See the
+[benchmark summary and figures](inst/benchmark/README.md) for checked results
 and measurement limitations.
 
 This is a representation prototype, not a drop-in replacement. Explicit unit

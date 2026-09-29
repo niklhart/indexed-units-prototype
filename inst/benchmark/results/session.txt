@@ -1,18 +1,15 @@
 Seed: 20260928
-Run: 2026-09-29 16:06:20
-Git revision: bb2027235f070b8f99f7782736746ed10fb4b562
+Run: 2026-09-29 19:33:16
+Git revision: afbcdb0eeb1aab3cc2803303fe6b695717080c88
 units version: 1.0-1.6
 units GitHub revision: a823fef46d92ee4e1b2e2fa28ddf4c19d67cefb6
 Working tree:
 
- M DESCRIPTION
  M inst/benchmark/README.md
  M inst/benchmark/results/iterations.csv
  M inst/benchmark/results/session.txt
- M inst/benchmark/results/statuses.csv
  M inst/benchmark/results/timings.csv
  M inst/benchmark/run.R
- M renv.lock
 
 UDUNITS database: /Users/niklashartung/Library/Caches/org.R-project.R/R/renv/cache/v5/macos/R-4.5/aarch64-apple-darwin20/units/1.0-1.6/73762d608403d51c5865638fe913f28a/units/share/udunits/udunits2.xml
 R version 4.5.2 (2025-10-31)

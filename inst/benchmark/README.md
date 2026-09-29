@@ -17,15 +17,18 @@ Cases investigated:
 
 Current findings (10,000 elements, two balanced unit types):
 
-- **Much smaller storage and faster arithmetic:** about 15× less retained memory; addition with conversion was about 850× faster and scalar multiplication about 910× faster.
-- **Benefits vary by operation:** pivots, row binding, and replacement were faster, while concatenation was slightly slower.
+- **Much smaller storage and faster arithmetic:** about 15× less retained memory; addition with conversion was about 840× faster and scalar multiplication about 950× faster.
+- **Dictionary cleanup has a cost:** replacement, row binding, and pivots now take about 4.1×, 2.5×, and 1.7× their previous runtimes. These operations, slicing, and concatenation were slower than `mixed_units` in this run.
+- **Storage and allocations differ:** despite smaller retained objects, most `IndexedUnits` operations allocate more temporary memory; the pivot round trip allocated about 12.2 MB versus 3.7 MB.
 - **Some behavior differs:** repetition still loses the `mixed_units` class and a sparse pivot fails when printed. These are not counted as speedups.
 
-Results are exploratory medians of 3–5 warm-process iterations, including garbage collection. Values and unit labels are checked before timing. Fixtures are prepared outside timings except for construction; retained memory and temporary allocations are measured separately. This run includes dictionary-level remapping and arithmetic grouped by integer unit IDs.
+Results are exploratory medians of 3–5 warm-process iterations, including garbage collection. Values and unit labels are checked before timing. Fixtures are prepared outside timings except for construction; retained memory and temporary allocations are measured separately. This run includes dictionary cleanup after subsetting and reshaping, alongside dictionary-level remapping and arithmetic grouped by integer unit IDs.
 
-The figure shows the two-unit, balanced/shuffled cases; each panel has its own logarithmic time scale. The full grid is in the raw results.
+The runtime figure shows the two-unit, balanced/shuffled cases. The memory figure's top row shows retained object size for 1, 2, and 8 unit types; the remaining panels show allocations per operation with two unit types. These allocations are not peak memory. Each panel has its own logarithmic scale. The full grid is in the raw results.
 
 ![Runtime comparison, including explicit unit conversion](results/runtime.png)
+
+![Retained object size and allocation comparison](results/memory.png)
 
 To reproduce, run from the package root (see the [project README](../../README.md) for the UDUNITS system dependency):
 
