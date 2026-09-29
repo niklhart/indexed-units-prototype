@@ -1,8 +1,33 @@
-# indexed-units-prototype
-A design experiment for an alternative to the mixed_units class, intended for upstream discussion with units package authors
+# IndexedUnits: a representation proposal for mixed units
 
-Run `renv::restore()` from the project root to install the pinned dependencies,
-including the GitHub version of `units`. Building `units` requires the UDUNITS
-system library (`brew install udunits` on macOS or `libudunits2-dev` on Debian/Ubuntu).
+This prototype explores an alternative representation for `units::mixed_units`,
+intended for discussion with the `units` package authors. It stores a numeric
+vector with two attributes: an integer unit ID per element and a dictionary of
+distinct units. This avoids allocating a separate `units` object for every value.
 
-See the [benchmark summary](inst/benchmark/README.md) for results and the command to rerun it.
+- **Compact storage:** most useful for long vectors containing few distinct units.
+- **Grouped arithmetic:** values sharing a unit pair are processed together through
+  `units`, retaining its conversion and dimensional rules.
+- **Pipeline support:** vctrs methods preserve values and units through row binding
+  and tidyr pivots, including missing elements, without scalar list-columns.
+
+```r
+x <- indexed_units(c(1, 2, 3), c("mg", "L", "mg"))
+x * 2
+data.frame(value = x)
+```
+
+Against GitHub `units` 1.0-1.6, the benchmark case with 10,000 elements and two
+unit types used about **15× less retained memory** and showed large arithmetic
+speedups. Gains vary by operation; concatenation was slightly slower. See the
+[benchmark summary and figure](inst/benchmark/README.md) for checked results
+and measurement limitations.
+
+This is a representation prototype, not a drop-in replacement. Explicit unit
+conversion and full integration with the `units` API remain outside its current
+scope.
+
+To reproduce, run `renv::restore()` from the project root, then
+`Rscript inst/benchmark/run.R`. The lockfile pins the GitHub revision of `units`.
+Building it requires UDUNITS (`brew install udunits` on macOS or
+`libudunits2-dev` on Debian/Ubuntu).
