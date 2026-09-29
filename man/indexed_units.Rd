@@ -29,7 +29,9 @@ is not a subclass of \code{units::mixed_units} or \code{units}.
 Subsetting, replacement, repetition, concatenation, and base data frames are
 supported. Optional vctrs methods support tidyr pivots without scalar
 list-columns. Unit dictionaries are merged without converting stored values.
-Subsetting, replacement, and reshaping remove unused dictionary entries.
+Subsetting, replacement, and reshaping remove unused dictionary entries,
+except for empty vectors or vectors whose unit IDs are all unknown. These
+retain their dictionary so reshaping can fill missing buffers safely.
 Missing elements introduced by indexing or reshaping have unknown units
 (\code{NA}), distinct from dimensionless values (\code{"1"}).
 Scalar extraction with \code{[[} returns an ordinary \code{units} object, or \code{NULL}

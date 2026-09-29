@@ -7,7 +7,9 @@
 #' Subsetting, replacement, repetition, concatenation, and base data frames are
 #' supported. Optional vctrs methods support tidyr pivots without scalar
 #' list-columns. Unit dictionaries are merged without converting stored values.
-#' Subsetting, replacement, and reshaping remove unused dictionary entries.
+#' Subsetting, replacement, and reshaping remove unused dictionary entries,
+#' except for empty vectors or vectors whose unit IDs are all unknown. These
+#' retain their dictionary so reshaping can fill missing buffers safely.
 #' Missing elements introduced by indexing or reshaping have unknown units
 #' (`NA`), distinct from dimensionless values (`"1"`).
 #' Scalar extraction with `[[` returns an ordinary `units` object, or `NULL`
@@ -76,7 +78,7 @@ indexed_units <- function(x = double(), unit = NULL) {
 
 .compact_indexed_units <- function(value, id, dictionary, names = NULL) {
     used <- which(tabulate(id, nbins = length(dictionary)) > 0L)
-    if (length(used) != length(dictionary)) {
+    if (length(used) && length(used) != length(dictionary)) {
         id <- match(id, used)
         dictionary <- dictionary[used]
     }
@@ -277,9 +279,10 @@ anyDuplicated.IndexedUnits <- function(x, incomparables = FALSE, ...) {
 
 #' @exportS3Method vctrs::vec_proxy
 vec_proxy.IndexedUnits <- function(x, ...) {
-    # A compacted missing-value buffer has no dictionary. Carry labels through
-    # vctrs assignment so its restored values do not depend on the buffer's IDs.
-    vctrs::new_data_frame(list(value = .indexed_values(x), unit = indexed_unit_labels(x)))
+    # Carry integer IDs and their dictionary without expanding unit labels.
+    unit <- structure(attr(x, "unit_id"),
+        levels = attr(x, "unit_dictionary"), class = "factor")
+    vctrs::new_data_frame(list(value = .indexed_values(x), unit = unit))
 }
 
 #' @exportS3Method vctrs::vec_proxy_equal
@@ -294,13 +297,11 @@ vec_proxy_compare.IndexedUnits <- function(x, ...) {
 
 #' @exportS3Method vctrs::vec_restore
 vec_restore.IndexedUnits <- function(x, to, ...) {
-    used <- unique(x$unit[!is.na(x$unit)])
-    dictionary <- union(intersect(attr(to, "unit_dictionary"), used), used)
-    .new_indexed_units(x$value, match(x$unit, dictionary), dictionary)
+    .compact_indexed_units(x$value, as.integer(x$unit), levels(x$unit))
 }
 
 # Prototypes must retain dictionary metadata for casting and combining vectors.
-# Unlike a user-facing empty slice, they describe the available unit types.
+# They describe the available unit types even without any values.
 #' @exportS3Method vctrs::vec_ptype
 vec_ptype.IndexedUnits <- function(x, ...) {
     .new_indexed_units(double(), integer(), attr(x, "unit_dictionary"))
@@ -314,8 +315,6 @@ vec_ptype2.IndexedUnits.IndexedUnits <- function(x, y, ...) {
 #' @exportS3Method vctrs::vec_cast
 vec_cast.IndexedUnits.IndexedUnits <- function(x, to, ...) {
     dictionary <- attr(to, "unit_dictionary")
-    # Empty dictionaries describe an untyped missing-value buffer or prototype.
-    if (!length(dictionary)) return(x)
     id <- .remap_unit_ids(x, dictionary)
     if (any(!is.na(attr(x, "unit_id")) & is.na(id))) {
         stop("Target unit dictionary does not contain all source units.", call. = FALSE)

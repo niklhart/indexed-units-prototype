@@ -151,8 +151,8 @@ test_that("subsetting removes unused dictionary entries and remaps IDs", {
         expect_identical(unname(attr(y, "unit_id")), c(2L, 1L, 2L, NA_integer_))
         expect_identical(attr(slice(1), "unit_dictionary"), "mg")
         expect_identical(attr(slice(2), "unit_dictionary"), "L")
-        expect_identical(attr(slice(integer()), "unit_dictionary"), character())
-        expect_identical(attr(slice(c(4, NA_integer_)), "unit_dictionary"), character())
+        expect_identical(attr(slice(integer()), "unit_dictionary"), attr(x, "unit_dictionary"))
+        expect_identical(attr(slice(c(4, NA_integer_)), "unit_dictionary"), attr(x, "unit_dictionary"))
     }
     expect_named(x[c("c", "b")], c("c", "b"))
     expect_identical(attr(x, "unit_dictionary"), c("mg", "L", "s"))
@@ -180,11 +180,11 @@ test_that("compact dictionaries survive assignment and vctrs combination", {
     x[1] <- x[2]
     expect_indexed(x, c(2, 2), c("L", "L"))
     expect_identical(attr(x, "unit_dictionary"), "L")
-    expect_identical(attr(vctrs::vec_init(ptype, 2), "unit_dictionary"), character())
+    expect_identical(attr(vctrs::vec_init(ptype, 2), "unit_dictionary"), attr(ptype, "unit_dictionary"))
     blank <- vctrs::vec_init(ptype, 3)
     filled <- vctrs::vec_assign(blank, c(1, 3), y)
     expect_indexed(filled, c(3, NA, 4), c("s", NA, "mg"))
-    expect_identical(attr(filled, "unit_dictionary"), c("s", "mg"))
+    expect_identical(attr(filled, "unit_dictionary"), c("mg", "s"))
 })
 
 test_that("pivoted columns retain only the units they actually contain", {
@@ -204,7 +204,7 @@ test_that("pivoted columns retain only the units they actually contain", {
         tidyr::pivot_longer(wide, c(mass, volume, absent)),
         names_from = name, values_from = value
     )
-    expect_identical(attr(roundtrip$absent, "unit_dictionary"), character())
+    expect_identical(attr(roundtrip$absent, "unit_dictionary"), c("mg", "L"))
     expect_indexed(roundtrip$absent, c(NA_real_, NA_real_), c(NA_character_, NA_character_))
 })
 
@@ -258,4 +258,23 @@ test_that("arithmetic groups IDs and merges equal result units across pairs", {
     expect_identical(x == x, c(TRUE, TRUE, NA, TRUE, NA))
     expect_indexed(indexed_units(NA_real_, NA_character_) * x, rep(NA_real_, 5), rep(NA_character_, 5))
     expect_indexed(x * numeric(), numeric(), character())
+})
+
+test_that("factor proxies preserve dictionary meaning in missing buffers", {
+    source <- indexed_units(c(1, NA, 3), c("s", "mg", "L"))
+    target <- indexed_units(c(0, 0, 0), c("L", "s", "mg"))
+    blank <- vctrs::vec_init(target, 4)
+    filled <- vctrs::vec_assign(blank, c(3, 1, 4), source)
+    expect_indexed(filled, c(NA, NA, 1, 3), c("mg", NA, "s", "L"))
+    expect_identical(attr(filled, "unit_dictionary"), c("L", "s", "mg"))
+    expect_indexed(vctrs::vec_slice(filled, c(4, 3)), c(3, 1), c("L", "s"))
+    # A buffer with no available unit types must reject known units, not lose them.
+    unknown <- indexed_units(rep(NA_real_, 2), NA_character_)
+    expect_error(vctrs::vec_assign(unknown, 1, source[1]), "does not contain")
+    expect_indexed(vctrs::vec_c(unknown, source[1]), c(NA, NA, 1), c(NA, NA, "s"))
+    # Factors with different dictionary orders still compare by unit meaning.
+    a <- indexed_units(c(1, 2), c("mg", "L"))
+    b <- indexed_units(c(2, 1), c("L", "mg"))
+    expect_identical(vctrs::vec_equal(a, b[2:1]), c(TRUE, TRUE))
+    expect_identical(vctrs::vec_duplicate_detect(vctrs::vec_c(a, b)), rep(TRUE, 4))
 })
