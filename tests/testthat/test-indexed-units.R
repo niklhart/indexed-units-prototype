@@ -62,6 +62,22 @@ test_that("base data frames preserve indexed units through row operations", {
     expect_output(print(d), "mg")
 })
 
+test_that("dimensionless addition and comparisons require unit-bearing operands", {
+    x <- indexed_units(c(1, 2))
+    for (op in c("+", "-", "==", "!=", "<", "<=", ">", ">=")) {
+        expect_error(do.call(op, list(x, 1)), "Both operands")
+        expect_error(do.call(op, list(1, x)), "Both operands")
+    }
+    expect_indexed(x + indexed_units(1), c(2, 3), c("1", "1"))
+    expect_indexed(x - indexed_units(1), c(0, 1), c("1", "1"))
+    expect_identical(x == indexed_units(1), c(TRUE, FALSE))
+    expect_identical(x > indexed_units(1), c(FALSE, TRUE))
+    expect_indexed(x * 2, c(2, 4), c("1", "1"))
+    expect_indexed(2 * x, c(2, 4), c("1", "1"))
+    expect_indexed(x / 2, c(0.5, 1), c("1", "1"))
+    expect_indexed(2 / x, c(2, 1), c("1", "1"))
+})
+
 test_that("empty operations and missing values retain valid metadata", {
     x <- indexed_units(c(1, NA), c("mg", NA))
     expect_indexed(x[integer()], numeric(), character())

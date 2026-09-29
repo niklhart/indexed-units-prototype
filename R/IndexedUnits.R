@@ -14,7 +14,9 @@
 #'
 #' Arithmetic supports unary `+`/`-`, binary `+`, `-`, `*`, `/`, and comparisons.
 #' Operations are grouped by unit pairs and delegated to `units`. Operands must
-#' have equal lengths or one must be scalar. Plain numbers are dimensionless;
+#' have equal lengths or one must be scalar. Plain numbers are accepted only
+#' for multiplication and division; addition, subtraction, and comparisons
+#' require two `IndexedUnits` operands, even when dimensionless. Explicitly
 #' convert ordinary `units` operands with `indexed_units()` before arithmetic.
 #' Math functions and summaries are deliberately unsupported in this prototype.
 #' Duplicate detection and vctrs equality use the stored value and unit label,
@@ -182,6 +184,10 @@ Ops.IndexedUnits <- function(e1, e2) {
     }
     if (!op %in% c("+", "-", "*", "/", "==", "!=", "<", "<=", ">", ">=")) {
         stop("Operation not supported: ", op, call. = FALSE)
+    }
+    if (op %in% c("+", "-", "==", "!=", "<", "<=", ">", ">=") &&
+        (!inherits(e1, "IndexedUnits") || !inherits(e2, "IndexedUnits"))) {
+        stop("Both operands must be IndexedUnits for addition, subtraction, or comparison.", call. = FALSE)
     }
     e1 <- indexed_units(e1)
     e2 <- indexed_units(e2)

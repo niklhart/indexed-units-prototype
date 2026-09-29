@@ -36,7 +36,9 @@ for an element with an unknown unit, matching missing \code{mixed_units} element
 
 Arithmetic supports unary \code{+}/\code{-}, binary \code{+}, \code{-}, \code{*}, \code{/}, and comparisons.
 Operations are grouped by unit pairs and delegated to \code{units}. Operands must
-have equal lengths or one must be scalar. Plain numbers are dimensionless;
+have equal lengths or one must be scalar. Plain numbers are accepted only
+for multiplication and division; addition, subtraction, and comparisons
+require two \code{IndexedUnits} operands, even when dimensionless. Explicitly
 convert ordinary \code{units} operands with \code{indexed_units()} before arithmetic.
 Math functions and summaries are deliberately unsupported in this prototype.
 Duplicate detection and vctrs equality use the stored value and unit label,
