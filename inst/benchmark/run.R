@@ -1,6 +1,6 @@
 # Run from the package root: Rscript inst/benchmark/run.R
 out <- "inst/benchmark/results"
-required <- c("bench", "lobstr", "pkgload", "units", "tidyr", "dplyr")
+required <- c("bench", "lobstr", "pkgload", "units", "tidyr", "dplyr", "ggplot2")
 missing <- required[!vapply(required, requireNamespace, logical(1), quietly = TRUE)]
 if (length(missing)) stop("Install benchmark dependencies: ", paste(missing, collapse = ", "))
 stopifnot(file.exists("DESCRIPTION"), file.exists("R/IndexedUnits.R"))
@@ -54,6 +54,15 @@ for (case in seq_len(nrow(grid))) {
     mx <- units::mixed_units(value, unit)
     iy <- indexed_units(value / 2, converted[ids])
     my <- units::mixed_units(value / 2, converted[ids])
+    target <- converted[ids]
+    # Reference conversion through ordinary homogeneous units vectors, untimed.
+    expected_values <- numeric(n)
+    for (j in seq_len(k)) {
+        i <- which(ids == j)
+        u <- units::set_units(value[i], labels[j], mode = "standard")
+        expected_values[i] <- as.numeric(units::set_units(u, converted[j], mode = "standard"))
+    }
+    expected_conversion <- indexed_units(expected_values, target)
     # Different first-occurrence order, with overlapping and new dictionary entries.
     other_unit <- rep_len(rev(c(labels[seq_len(k)], "K")), n)
     iz <- indexed_units(value, other_unit)
@@ -80,6 +89,9 @@ for (case in seq_len(nrow(grid))) {
     replace <- function(x, replacement) { x[replace_at] <- replacement; x }
     jobs <- list(
         construct = list(function() indexed_units(value, unit), function() units::mixed_units(value, unit)),
+        # IndexedUnits has no explicit-conversion API: the first entry is only
+        # a correctness reference and is deliberately excluded from timing.
+        convert_units = list(function() expected_conversion, function() units::set_units(mx, target)),
         slice = list(function() ix[take], function() mx[take]),
         repetition = list(function() rep(ix, 2), function() rep(mx, 2)),
         replace = list(function() replace(ix, replacement_i), function() replace(mx, replacement_m)),
@@ -117,19 +129,27 @@ for (case in seq_len(nrow(grid))) {
             detail = if (is.null(error)) "" else error)
         if (!is.null(error)) next
         # Check above is outside timing; native outputs intentionally have different classes.
-        result <- bench::mark(IndexedUnits = f(), mixed_units = g(), check = FALSE,
+        if (workload == "convert_units") {
+            implementations <- "mixed_units"
+            result <- bench::mark(mixed_units = g(), check = FALSE,
+                                  min_iterations = 3, max_iterations = 5, min_time = 0.1,
+                                  filter_gc = FALSE)
+        } else {
+            implementations <- c("IndexedUnits", "mixed_units")
+            result <- bench::mark(IndexedUnits = f(), mixed_units = g(), check = FALSE,
                               min_iterations = 3, max_iterations = 5, min_time = 0.1,
                               filter_gc = FALSE)
+        }
         timings[[length(timings) + 1L]] <- cbind(spec, workload,
             observed_pairs = if (workload == "multiply_pairs") nrow(unique(data.frame(unit, independent_unit))) else NA_integer_,
-            implementation = c("IndexedUnits", "mixed_units"),
+            implementation = implementations,
             median_seconds = as.numeric(result$median), min_seconds = as.numeric(result$min),
             allocated_bytes = as.numeric(result$mem_alloc), iterations = result$n_itr,
             garbage_collections = result$n_gc)
         for (j in seq_len(nrow(result))) {
             elapsed <- as.numeric(result$time[[j]])
             iterations[[length(iterations) + 1L]] <- cbind(spec, workload,
-                implementation = c("IndexedUnits", "mixed_units")[[j]],
+                implementation = implementations[[j]],
                 iteration = seq_along(elapsed), elapsed_seconds = elapsed)
         }
     }
@@ -168,4 +188,27 @@ capture.output({
 if (any(vapply(statuses, function(x) x$status == "failed", logical(1)))) {
     stop("Some correctness checks failed; see statuses.csv. Failed workloads were not timed.")
 }
+
+# One issue-ready figure; the full grid remains available in the CSV files.
+library(ggplot2)
+plot_data <- subset(do.call(rbind, timings), k == 2 & distribution == "balanced_shuffled")
+workload_labels <- c(construct = "Construction", convert_units = "Explicit conversion*",
+    slice = "Slicing", replace = "Replacement", concatenate = "Concatenation",
+    scale = "Scalar multiplication", add_same = "Addition: same units",
+    add_convert = "Addition: unit conversion", multiply_pairs = "Multiplication: unit pairs",
+    bind_rows = "Row binding", filter_mutate = "Filter + mutate", pivot_roundtrip = "Pivot round trip")
+plot_data$workload <- factor(plot_data$workload, levels = names(workload_labels), labels = workload_labels)
+p <- ggplot(plot_data, aes(n, median_seconds * 1000, colour = implementation)) +
+    geom_line(linewidth = 0.7) + geom_point(size = 2) +
+    scale_x_log10(breaks = lengths, labels = c("100", "1,000", "10,000")) +
+    scale_y_log10() + scale_colour_manual(values = c(IndexedUnits = "#0072B2", mixed_units = "#D55E00")) +
+    facet_wrap(~workload, ncol = 3, scales = "free_y") +
+    labs(title = "IndexedUnits and mixed_units",
+         subtitle = paste0("Two balanced, shuffled unit types | units ", units_version$Version,
+                           " (", substr(units_version$RemoteSha %||% "CRAN", 1, 7), ")"),
+         x = "Number of elements (log scale)", y = "Median elapsed time, ms (log scale; panel-specific ranges)",
+         colour = NULL,
+         caption = "3–5 timed iterations, including GC. Values and unit labels checked before timing.\n*Explicit conversion: mixed_units only; IndexedUnits has no conversion API.\nRepetition loses the mixed_units class and is not timed.") +
+    theme_bw(base_size = 11) + theme(legend.position = "top", plot.caption = element_text(hjust = 0))
+ggsave(file.path(out, "runtime.png"), p, width = 12, height = 10, dpi = 180, bg = "white")
 message("Done. Measurements saved in inst/benchmark/results/.")

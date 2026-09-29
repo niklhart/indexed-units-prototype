@@ -21,6 +21,7 @@ Imports:
 Suggests: 
     bench,
     dplyr,
+    ggplot2,
     lobstr,
     pkgload,
     testthat (>= 3.0.0)

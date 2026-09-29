@@ -11,16 +11,21 @@ Cases investigated:
 - **Construction and storage:** creating vectors from values and unit labels, and measuring retained memory.
 - **Vector operations:** slicing, repetition, replacing 1% of entries, and concatenating vectors with overlapping unit dictionaries.
 - **Arithmetic:** scalar multiplication, addition with and without conversion, and multiplication across different unit pairs.
+- **Explicit conversion:** `set_units()` on `mixed_units`, checked against conversions of homogeneous `units` vectors. Only `mixed_units` is timed here because `IndexedUnits` has no conversion API.
 - **Pipelines:** row binding, filtering with arithmetic in `mutate()`, and long/wide pivot round trips.
 - **Missing values:** a sparse pivot followed by printing, checked separately from timings.
 
 Current findings (10,000 elements, two balanced unit types):
 
-- **Much smaller storage and faster arithmetic:** about 15× less retained memory; addition with conversion was about 810× faster and scalar multiplication about 850× faster.
+- **Much smaller storage and faster arithmetic:** about 15× less retained memory; addition with conversion was about 850× faster and scalar multiplication about 910× faster.
 - **Benefits vary by operation:** pivots, row binding, and replacement were faster, while concatenation was slightly slower.
 - **Some behavior differs:** repetition still loses the `mixed_units` class and a sparse pivot fails when printed. These are not counted as speedups.
 
 Results are exploratory medians of 3–5 warm-process iterations, including garbage collection. Values and unit labels are checked before timing. Fixtures are prepared outside timings except for construction; retained memory and temporary allocations are measured separately. This run includes dictionary-level remapping and arithmetic grouped by integer unit IDs.
+
+The figure shows the two-unit, balanced/shuffled cases; each panel has its own logarithmic time scale. The full grid is in the raw results.
+
+![Runtime comparison, including explicit unit conversion](results/runtime.png)
 
 To reproduce, run from the package root (see the [project README](../../README.md) for the UDUNITS system dependency):
 

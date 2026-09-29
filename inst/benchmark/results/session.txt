@@ -1,21 +1,18 @@
 Seed: 20260928
-Run: 2026-09-29 14:39:17
-Git revision: 627afdf140a8b54ea58be11df9cf8e32b5c6785f
+Run: 2026-09-29 16:06:20
+Git revision: bb2027235f070b8f99f7782736746ed10fb4b562
 units version: 1.0-1.6
 units GitHub revision: a823fef46d92ee4e1b2e2fa28ddf4c19d67cefb6
 Working tree:
 
- M .Rbuildignore
  M DESCRIPTION
- M README.md
+ M inst/benchmark/README.md
  M inst/benchmark/results/iterations.csv
  M inst/benchmark/results/session.txt
- M inst/benchmark/results/sizes.csv
+ M inst/benchmark/results/statuses.csv
  M inst/benchmark/results/timings.csv
  M inst/benchmark/run.R
-?? .Rprofile
-?? renv.lock
-?? renv/
+ M renv.lock
 
 UDUNITS database: /Users/niklashartung/Library/Caches/org.R-project.R/R/renv/cache/v5/macos/R-4.5/aarch64-apple-darwin20/units/1.0-1.6/73762d608403d51c5865638fe913f28a/units/share/udunits/udunits2.xml
 R version 4.5.2 (2025-10-31)
@@ -39,11 +36,12 @@ other attached packages:
 [1] indexedunits_0.0.0.9000 testthat_3.3.2
 
 loaded via a namespace (and not attached):
- [1] desc_1.4.3       tidyr_1.3.2      R6_2.6.1         tidyselect_1.2.1
- [5] magrittr_2.0.4   glue_1.8.0       tibble_3.3.1     pkgconfig_2.0.3
- [9] dplyr_1.2.0      generics_0.1.4   lifecycle_1.0.5  profmem_0.7.0
-[13] cli_3.6.5        bench_1.1.4      vctrs_0.7.2      withr_3.0.2
-[17] renv_1.2.3       pkgload_1.5.0    compiler_4.5.2   rprojroot_2.1.1
-[21] purrr_1.2.1      tools_4.5.2      pkgbuild_1.4.8   brio_1.1.5
-[25] pillar_1.11.1    Rcpp_1.1.1       rlang_1.1.7      lobstr_1.2.2
-[29] units_1.0-1.6
+ [1] vctrs_0.7.2        cli_3.6.5          rlang_1.1.7        bench_1.1.4
+ [5] purrr_1.2.1        pkgload_1.5.0      renv_1.2.3         generics_0.1.4
+ [9] S7_0.2.1           glue_1.8.0         rprojroot_2.1.1    pkgbuild_1.4.8
+[13] brio_1.1.5         scales_1.4.0       grid_4.5.2         tibble_3.3.1
+[17] profmem_0.7.0      lifecycle_1.0.5    compiler_4.5.2     lobstr_1.2.2
+[21] dplyr_1.2.0        RColorBrewer_1.1-3 Rcpp_1.1.1         pkgconfig_2.0.3
+[25] tidyr_1.3.2        farver_2.1.2       R6_2.6.1           tidyselect_1.2.1
+[29] pillar_1.11.1      magrittr_2.0.4     withr_3.0.2        tools_4.5.2
+[33] gtable_0.3.6       units_1.0-1.6      ggplot2_4.0.2      desc_1.4.3
