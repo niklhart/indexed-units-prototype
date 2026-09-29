@@ -7,6 +7,7 @@
 #' Subsetting, replacement, repetition, concatenation, and base data frames are
 #' supported. Optional vctrs methods support tidyr pivots without scalar
 #' list-columns. Unit dictionaries are merged without converting stored values.
+#' Subsetting, replacement, and reshaping remove unused dictionary entries.
 #' Missing elements introduced by indexing or reshaping have unknown units
 #' (`NA`), distinct from dimensionless values (`"1"`).
 #' Scalar extraction with `[[` returns an ordinary `units` object, or `NULL`
@@ -73,6 +74,15 @@ indexed_units <- function(x = double(), unit = NULL) {
               names = names, class = "IndexedUnits")
 }
 
+.compact_indexed_units <- function(value, id, dictionary, names = NULL) {
+    used <- which(tabulate(id, nbins = length(dictionary)) > 0L)
+    if (length(used) != length(dictionary)) {
+        id <- match(id, used)
+        dictionary <- dictionary[used]
+    }
+    .new_indexed_units(value, id, dictionary, names)
+}
+
 #' @rdname indexed_units
 #' @export
 indexed_unit_labels <- function(x) {
@@ -98,7 +108,7 @@ indexed_unit_labels <- function(x) {
     value <- .indexed_values(x)[i]
     ids <- attr(x, "unit_id")
     names(ids) <- names(x)
-    .new_indexed_units(value, ids[i], attr(x, "unit_dictionary"), names(value))
+    .compact_indexed_units(value, ids[i], attr(x, "unit_dictionary"), names(value))
 }
 
 #' @export
@@ -123,7 +133,7 @@ indexed_unit_labels <- function(x) {
     names(ids) <- names(x)
     values[i] <- .indexed_values(value)
     ids[i] <- .remap_unit_ids(value, dictionary)
-    .new_indexed_units(values, ids, dictionary, names(values))
+    .compact_indexed_units(values, ids, dictionary, names(values))
 }
 
 #' @export
@@ -148,7 +158,7 @@ c.IndexedUnits <- function(..., recursive = FALSE) {
     dictionary <- unique(unlist(lapply(xs, attr, "unit_dictionary"), use.names = FALSE))
     value <- do.call(c, lapply(xs, .indexed_values))
     ids <- unlist(lapply(xs, .remap_unit_ids, dictionary = dictionary), use.names = FALSE)
-    .new_indexed_units(value %||% double(), ids, dictionary %||% character(), names(value))
+    .compact_indexed_units(value %||% double(), ids, dictionary %||% character(), names(value))
 }
 
 #' @export
@@ -267,12 +277,14 @@ anyDuplicated.IndexedUnits <- function(x, incomparables = FALSE, ...) {
 
 #' @exportS3Method vctrs::vec_proxy
 vec_proxy.IndexedUnits <- function(x, ...) {
-    vctrs::new_data_frame(list(value = .indexed_values(x), unit_id = attr(x, "unit_id")))
+    # A compacted missing-value buffer has no dictionary. Carry labels through
+    # vctrs assignment so its restored values do not depend on the buffer's IDs.
+    vctrs::new_data_frame(list(value = .indexed_values(x), unit = indexed_unit_labels(x)))
 }
 
 #' @exportS3Method vctrs::vec_proxy_equal
 vec_proxy_equal.IndexedUnits <- function(x, ...) {
-    vctrs::new_data_frame(list(value = .indexed_values(x), unit = indexed_unit_labels(x)))
+    vec_proxy.IndexedUnits(x)
 }
 
 #' @exportS3Method vctrs::vec_proxy_compare
@@ -282,7 +294,16 @@ vec_proxy_compare.IndexedUnits <- function(x, ...) {
 
 #' @exportS3Method vctrs::vec_restore
 vec_restore.IndexedUnits <- function(x, to, ...) {
-    .new_indexed_units(x$value, x$unit_id, attr(to, "unit_dictionary"))
+    used <- unique(x$unit[!is.na(x$unit)])
+    dictionary <- union(intersect(attr(to, "unit_dictionary"), used), used)
+    .new_indexed_units(x$value, match(x$unit, dictionary), dictionary)
+}
+
+# Prototypes must retain dictionary metadata for casting and combining vectors.
+# Unlike a user-facing empty slice, they describe the available unit types.
+#' @exportS3Method vctrs::vec_ptype
+vec_ptype.IndexedUnits <- function(x, ...) {
+    .new_indexed_units(double(), integer(), attr(x, "unit_dictionary"))
 }
 
 #' @exportS3Method vctrs::vec_ptype2
@@ -293,6 +314,8 @@ vec_ptype2.IndexedUnits.IndexedUnits <- function(x, y, ...) {
 #' @exportS3Method vctrs::vec_cast
 vec_cast.IndexedUnits.IndexedUnits <- function(x, to, ...) {
     dictionary <- attr(to, "unit_dictionary")
+    # Empty dictionaries describe an untyped missing-value buffer or prototype.
+    if (!length(dictionary)) return(x)
     id <- .remap_unit_ids(x, dictionary)
     if (any(!is.na(attr(x, "unit_id")) & is.na(id))) {
         stop("Target unit dictionary does not contain all source units.", call. = FALSE)

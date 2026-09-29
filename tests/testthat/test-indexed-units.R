@@ -132,14 +132,80 @@ test_that("dictionary remapping preserves reordered, unused and unknown units", 
     expect_indexed(x, c(3, 4, NA), c("L", "mg", NA))
     expect_named(x, c("a", "b", "c"))
 
-    # A slice keeps unused dictionary entries; only used units must be castable.
-    target <- indexed_units(c(0, 0), c("L", "mg"))[integer()]
+    # A prototype, unlike an empty slice, retains the available unit types.
+    target <- vctrs::vec_ptype(indexed_units(c(0, 0), c("L", "mg")))
     expect_indexed(vctrs::vec_cast(x, target), c(3, 4, NA), c("L", "mg", NA))
     expect_named(vctrs::vec_cast(x, target), names(x))
     expect_indexed(vctrs::vec_cast(x[c(2, 3)], indexed_units(0, "mg")),
                    c(4, NA), c("mg", NA))
     expect_error(vctrs::vec_cast(x, indexed_units(0, "mg")), "does not contain")
     expect_indexed(vctrs::vec_cast(x[3], indexed_units()), NA_real_, NA_character_)
+})
+
+test_that("subsetting removes unused dictionary entries and remaps IDs", {
+    x <- indexed_units(c(a = 1, b = 2, c = 3, d = NA), c("mg", "L", "s", NA))
+    for (slice in list(function(i) x[i], function(i) vctrs::vec_slice(x, i))) {
+        y <- slice(c(3, 2, 3, 4))
+        expect_indexed(y, c(3, 2, 3, NA), c("s", "L", "s", NA))
+        expect_identical(attr(y, "unit_dictionary"), c("L", "s"))
+        expect_identical(unname(attr(y, "unit_id")), c(2L, 1L, 2L, NA_integer_))
+        expect_identical(attr(slice(1), "unit_dictionary"), "mg")
+        expect_identical(attr(slice(2), "unit_dictionary"), "L")
+        expect_identical(attr(slice(integer()), "unit_dictionary"), character())
+        expect_identical(attr(slice(c(4, NA_integer_)), "unit_dictionary"), character())
+    }
+    expect_named(x[c("c", "b")], c("c", "b"))
+    expect_identical(attr(x, "unit_dictionary"), c("mg", "L", "s"))
+    expect_identical(attr(rep(x, times = c(0, 2, 0, 0)), "unit_dictionary"), "L")
+    known_missing <- indexed_units(c(1, NA), c("mg", "L"))[2]
+    expect_identical(attr(known_missing, "unit_dictionary"), "L")
+})
+
+test_that("compact dictionaries survive assignment and vctrs combination", {
+    x <- indexed_units(c(1, 2), c("mg", "L"))
+    y <- indexed_units(c(3, 4), c("s", "mg"))
+    for (combine in list(c, vctrs::vec_c)) {
+        expect_indexed(combine(x[2], y[1], x[1]), c(2, 3, 1), c("L", "s", "mg"))
+    }
+    ptype <- vctrs::vec_ptype_common(x, y)
+    expect_identical(attr(ptype, "unit_dictionary"), c("mg", "L", "s"))
+    expect_indexed(vctrs::vec_c(x[2], y[1], .ptype = ptype), c(2, 3), c("L", "s"))
+    expect_identical(attr(vctrs::vec_c(x[2], y[1], .ptype = ptype), "unit_dictionary"), c("L", "s"))
+    cast <- vctrs::vec_cast(x[2], ptype)
+    expect_indexed(c(cast), 2, "L")
+    expect_identical(attr(c(cast), "unit_dictionary"), "L")
+    assigned <- vctrs::vec_assign(x, 1, x[2])
+    expect_indexed(assigned, c(2, 2), c("L", "L"))
+    expect_identical(attr(assigned, "unit_dictionary"), "L")
+    x[1] <- x[2]
+    expect_indexed(x, c(2, 2), c("L", "L"))
+    expect_identical(attr(x, "unit_dictionary"), "L")
+    expect_identical(attr(vctrs::vec_init(ptype, 2), "unit_dictionary"), character())
+    blank <- vctrs::vec_init(ptype, 3)
+    filled <- vctrs::vec_assign(blank, c(1, 3), y)
+    expect_indexed(filled, c(3, NA, 4), c("s", NA, "mg"))
+    expect_identical(attr(filled, "unit_dictionary"), c("s", "mg"))
+})
+
+test_that("pivoted columns retain only the units they actually contain", {
+    d <- data.frame(id = c(1, 1, 2), measurement = c("mass", "volume", "mass"))
+    d$value <- indexed_units(c(1, 2, 3), c("mg", "L", "mg"))
+    wide <- tidyr::pivot_wider(d, names_from = measurement, values_from = value)
+    expect_indexed(wide$mass, c(1, 3), c("mg", "mg"))
+    expect_indexed(wide$volume, c(2, NA), c("L", NA))
+    expect_identical(attr(wide$mass, "unit_dictionary"), "mg")
+    expect_identical(attr(wide$volume, "unit_dictionary"), "L")
+    expect_identical(attr(wide$volume, "unit_id"), c(1L, NA_integer_))
+    long <- tidyr::pivot_longer(wide, c(mass, volume))
+    expect_indexed(long$value, c(1, 2, 3, NA), c("mg", "L", "mg", NA))
+    expect_identical(attr(long$value, "unit_dictionary"), c("mg", "L"))
+    wide$absent <- vctrs::vec_init(d$value, 2)
+    roundtrip <- tidyr::pivot_wider(
+        tidyr::pivot_longer(wide, c(mass, volume, absent)),
+        names_from = name, values_from = value
+    )
+    expect_identical(attr(roundtrip$absent, "unit_dictionary"), character())
+    expect_indexed(roundtrip$absent, c(NA_real_, NA_real_), c(NA_character_, NA_character_))
 })
 
 test_that("constructors remap aliases and recycle scalar labels", {
